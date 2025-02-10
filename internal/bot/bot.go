@@ -45,18 +45,11 @@ func StartBot(token string) {
 	})
 	
 	bot.Handle("/add", func(ctx telebot.Context) error {
-		arg := ctx.Args()
-		if len(arg) == 0 {
-			return ctx.Send("Введите текст заметки после командв /add")
-		}
+		mu.Lock()
+		userState[ctx.Sender().ID] = "waiting_for_note"
+		mu.Unlock()
 
-		content := strings.Join(arg, " ")
-		err := service.CreateNote(ctx.Sender().ID, content)
-		if err != nil {
-			return ctx.Send("Ошибка при сохранении заметок.")
-		}
-
-		return ctx.Send("Заметка сохранена")
+		return ctx.Send("✏️ Введите текст заметки:")
 	})
 
 	bot.Handle("/notes", func(ctx telebot.Context) error {
@@ -84,6 +77,26 @@ func StartBot(token string) {
 			"🔹 `/help` - Показать это сообщение\n" +
 			"💡 Используйте кнопки ниже или введите команду вручную."
 		return ctx.Send(message)
+	})
+
+	bot.Handle(telebot.OnText, func(ctx telebot.Context) error {
+		mu.Lock()
+		state, exists := userState[ctx.Sender().ID]
+		mu.Unlock()
+
+		if exists && state == "waiting_for_note" {
+			mu.Lock()
+			delete(userState, ctx.Sender().ID)
+			mu.Unlock()
+
+			content := strings.TrimSpace(ctx.Text())
+			err := service.CreateNote(ctx.Sender().ID, content)
+			if err != nil {
+				log.Fatal("❌ Ошибка при сохранении заметки.", err)
+			}
+			return ctx.Send("✅ Ваша заметка сохранена.")
+		}
+		return nil
 	})
 
 	bot.Start()
