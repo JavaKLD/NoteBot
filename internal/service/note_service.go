@@ -54,6 +54,29 @@ func GetNotes(userId int64) ([]string, error) {
 	return notes, nil
 }
 
+func RedNote(userId int64, noteId int64, content string) error {
+	query := `UPDATE notes SET content = ? WHERE user_id = ? AND note_id = ?`
+
+	res, err := mysql.DB.Exec(query, content, userId, noteId)
+	if err != nil {
+		log.Fatal("Ошибка обновления заметки", err)
+		return err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		log.Fatal("Ошибка получения обновленных строк", err)
+		return err
+	}
+
+	if rowsAffected == 0 {
+		log.Fatal("Заметка не найдена или не обновлена", err)
+		return err
+	}
+
+	return nil
+}
+
 func DeleteNote(userId int64, noteId int64) error {
 	query:= `DELETE FROM notes WHERE user_id = ? AND note_id = ?`
 
@@ -74,5 +97,14 @@ func DeleteNote(userId int64, noteId int64) error {
 		return err
 	}
 
+	updateQuery := `
+		UPDATE notes 
+		SET note_id = note_id - 1 
+		WHERE user_id = ? AND note_id > ?`
+	_, err = mysql.DB.Exec(updateQuery, userId, noteId)
+	if err != nil {
+		log.Fatal("Ошибка при обновлении note_id:", err)
+		return err
+	}
 	return nil
 }
