@@ -6,8 +6,12 @@ import (
 	"log"
 	"reminder/internal/service"
 	"strings"
+	"sync"
 	"time"
 )
+
+var userState = make(map[int64]string)
+var mu sync.Mutex
 
 func StartBot(token string) {
 	bot, err := telebot.NewBot(telebot.Settings{
@@ -16,6 +20,18 @@ func StartBot(token string) {
 	})
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	commands := []telebot.Command{
+		{Text: "start", Description: "Запуск бота"},
+		{Text: "add", Description: "После /add напишите заметку которую хотите добавить"},
+		{Text: "notes", Description: "Вывод всех заметок"},
+		{Text: "help", Description: "Информация о боте"},
+	}
+
+	err = bot.SetCommands(commands)
+	if err != nil {
+		log.Fatal("Ошибка вывода меню команд ", err)
 	}
 
 	bot.Handle("/start", func(ctx telebot.Context) error {
@@ -58,6 +74,16 @@ func StartBot(token string) {
 			response += fmt.Sprintf("%d. %s\n", i + 1, note)
 		}
 		return ctx.Send(response)
+	})
+
+	bot.Handle("/help", func(ctx telebot.Context) error {
+		message := "📌 *Список доступных команд:*\n\n" +
+			"🔹 `/start` - Запустить бота\n" +
+			"🔹 `/add` - Добавить заметку\n" +
+			"🔹 `/notes` - Показать все заметки\n" +
+			"🔹 `/help` - Показать это сообщение\n" +
+			"💡 Используйте кнопки ниже или введите команду вручную."
+		return ctx.Send(message)
 	})
 
 	bot.Start()

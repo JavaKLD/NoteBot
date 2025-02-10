@@ -18,7 +18,7 @@ func CreateNote(userId int64, content string) error {
 }
 
 func GetNotes(userId int64) ([]string, error) {
-	query := `SELECT text FROM notes WHERE user_id = ?`
+	query := `SELECT content FROM notes WHERE user_id = ?`
 	rows, err := mysql.DB.Query(query, userId)
 	if err != nil {
 		return nil, err
@@ -27,11 +27,11 @@ func GetNotes(userId int64) ([]string, error) {
 
 	var notes []string
 	for rows.Next() {
-		var text string
-		if err := rows.Scan(&text); err != nil {
+		var content string
+		if err := rows.Scan(&content); err != nil {
 			return nil, err
 		}
-		notes = append(notes, text)
+		notes = append(notes, content)
 	}
 
 	if err := rows.Err(); err != nil {
