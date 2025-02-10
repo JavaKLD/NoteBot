@@ -5,6 +5,7 @@ import (
 	"gopkg.in/telebot.v4"
 	"log"
 	"reminder/internal/service"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ func StartBot(token string) {
 		{Text: "start", Description: "Запуск бота"},
 		{Text: "add", Description: "После /add напишите заметку которую хотите добавить"},
 		{Text: "notes", Description: "Вывод всех заметок"},
+		{Text: "delete", Description: "Удаление выбранной заметки"},
 		{Text: "help", Description: "Информация о боте"},
 	}
 
@@ -68,6 +70,28 @@ func StartBot(token string) {
 		}
 		return ctx.Send(response)
 	})
+	
+	bot.Handle("/delete", func(ctx telebot.Context) error {
+		mu.Lock()
+		userState[ctx.Sender().ID] = "waiting_for_delete"
+		mu.Unlock()
+
+		notes, err := service.GetNotes(ctx.Sender().ID)
+		if err != nil {
+			return ctx.Send("Ошибка при получении заметок.")
+		}
+
+		if len(notes) == 0 {
+			return ctx.Send("У вас нет заметок для удаления.")
+		}
+		response := "Ваши заметки:\n"
+		for i, note := range notes {
+			response += fmt.Sprintf("%d. %s\n", i+1, note)
+		}
+		response += "\nВведите номер заметки для удаления."
+
+		return ctx.Send(response)
+	})
 
 	bot.Handle("/help", func(ctx telebot.Context) error {
 		message := "📌 *Список доступных команд:*\n\n" +
@@ -95,6 +119,20 @@ func StartBot(token string) {
 				log.Fatal("❌ Ошибка при сохранении заметки.", err)
 			}
 			return ctx.Send("✅ Ваша заметка сохранена.")
+		}
+
+		if exists && state == "waiting_for_delete" {
+			noteIndex, err := strconv.ParseInt(strings.TrimSpace(ctx.Text()), 10, 64)
+			if err != nil || noteIndex < 1 {
+				return ctx.Send("❌ Введите правильный номер заметки для удаления.")
+			}
+
+			err = service.DeleteNote(ctx.Sender().ID, noteIndex)
+			if err != nil {
+				return ctx.Send("❌ Ошибка при удалении заметки.")
+			}
+
+			return ctx.Send("✅ Заметка удалена.")
 		}
 		return nil
 	})
